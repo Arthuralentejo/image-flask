@@ -1,8 +1,10 @@
 import base64
+import json
+import re
 
 from PIL import Image
-from flask import Flask, request, jsonify
-import io
+from flask import Flask, request, jsonify, make_response
+import pytesseract
 import numpy as np
 
 app = Flask(__name__)
@@ -10,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello_world():
-    return 'Here we are'
+    return jsonify('Here we are NOW')
 
 
 @app.route('/img', methods=['POST'])
@@ -20,17 +22,20 @@ def image():
     except Exception as err:
         print('error ocurred')
         print(err)
-        return "Image not received"
+        return jsonify("Image not received")
+
     img = Image.open(file.stream)
-    img.save('received-img.png')
-    dataB64 = base64.b64encode(file.stream.read())
-    image_np = np.array(dataB64)
-    return jsonify({
-        'size': [img.width, img.height],
-        'format': img.format,
-        'img': dataB64
-    })
+    text = pytesseract.image_to_string(img)
+    text = re.sub('[\\n,\\f]', '', text)
+    osd = pytesseract.image_to_osd(img)
+    osd = json.dumps(osd.replace('\n', ','))
+    payload = {
+        'osd': osd,
+        'text': text
+    }
+
+    return make_response(payload, 200)
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
